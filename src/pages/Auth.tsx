@@ -14,7 +14,15 @@ export default function Auth() {
   const location = useLocation();
   const redirectTo = location.state?.from?.pathname || '/dashboard';
 
-  const { user, profile, connectWallet, createProfile, connecting, loading } = useAuth();
+  const {
+    user,
+    profile,
+    connectWallet,
+    createProfile,
+    disconnectWallet,
+    connecting,
+    loading,
+  } = useAuth();
   const { toast } = useToast();
 
   const [showRegistration, setShowRegistration] = useState(false);
@@ -24,7 +32,12 @@ export default function Auth() {
     isCreator: false,
   });
 
-  // Redirect if already authenticated
+  // Clear any existing Supabase session when arriving here
+  useEffect(() => {
+    disconnectWallet();
+  }, []);
+
+  // Auto-redirect if user and profile exist
   useEffect(() => {
     if (loading || connecting) return;
     if (user && profile) {
@@ -38,34 +51,37 @@ export default function Auth() {
 
       if (result.error) {
         toast({
-          title: "Connection Failed",
-          description: "Unable to connect wallet. Please try again.",
-          variant: "destructive"
+          title: 'Connection Failed',
+          description: 'Unable to connect wallet. Please try again.',
+          variant: 'destructive',
         });
         return;
       }
 
       if (result.isNewUser) {
         setShowRegistration(true);
-        setRegistrationData(prev => ({
+        setRegistrationData((prev) => ({
           ...prev,
-          email: result.principalId ? `${result.principalId.substring(0, 8)}@icp.local` : ''
+          email: result.principalId
+            ? `${result.principalId.substring(0, 8)}@icp.local`
+            : '',
         }));
+
         toast({
-          title: "Wallet Connected",
-          description: "Please complete your profile to continue"
+          title: 'Wallet Connected',
+          description: 'Please complete your profile to continue.',
         });
       } else {
         toast({
-          title: "Welcome back!",
-          description: "Wallet connected successfully"
+          title: 'Welcome back!',
+          description: 'Wallet connected successfully.',
         });
       }
     } catch (error) {
       toast({
-        title: "Connection Failed",
-        description: "An unexpected error occurred. Please try again.",
-        variant: "destructive"
+        title: 'Connection Failed',
+        description: 'An unexpected error occurred. Please try again.',
+        variant: 'destructive',
       });
     }
   };
@@ -73,9 +89,9 @@ export default function Auth() {
   const handleRegistration = async () => {
     if (!registrationData.name.trim()) {
       toast({
-        title: "Missing Information",
-        description: "Please enter your name",
-        variant: "destructive"
+        title: 'Missing Information',
+        description: 'Please enter your full name.',
+        variant: 'destructive',
       });
       return;
     }
@@ -88,16 +104,15 @@ export default function Auth() {
 
     if (error) {
       toast({
-        title: "Registration Failed",
-        description: error.message || "Failed to create profile",
-        variant: "destructive"
+        title: 'Registration Failed',
+        description: error.message || 'Failed to create profile.',
+        variant: 'destructive',
       });
     } else {
       toast({
-        title: "Profile Created!",
-        description: "Welcome to Spark Funds"
+        title: 'Profile Created!',
+        description: 'Welcome to Spark Funds.',
       });
-      // Redirect after successful registration
       navigate(redirectTo, { replace: true });
     }
   };
@@ -138,7 +153,10 @@ export default function Auth() {
                   className="pl-10"
                   value={registrationData.name}
                   onChange={(e) =>
-                    setRegistrationData((prev) => ({ ...prev, name: e.target.value }))
+                    setRegistrationData((prev) => ({
+                      ...prev,
+                      name: e.target.value,
+                    }))
                   }
                 />
               </div>
@@ -152,7 +170,10 @@ export default function Auth() {
                 placeholder="your.email@example.com"
                 value={registrationData.email}
                 onChange={(e) =>
-                  setRegistrationData((prev) => ({ ...prev, email: e.target.value }))
+                  setRegistrationData((prev) => ({
+                    ...prev,
+                    email: e.target.value,
+                  }))
                 }
               />
             </div>
@@ -164,7 +185,7 @@ export default function Auth() {
                 onCheckedChange={(checked) =>
                   setRegistrationData((prev) => ({
                     ...prev,
-                    isCreator: checked as boolean
+                    isCreator: checked as boolean,
                   }))
                 }
               />
@@ -180,7 +201,11 @@ export default function Auth() {
               Complete Registration
             </Button>
 
-            <Button variant="outline" onClick={() => setShowRegistration(false)} className="w-full">
+            <Button
+              variant="outline"
+              onClick={() => setShowRegistration(false)}
+              className="w-full"
+            >
               Back to Login
             </Button>
           </CardContent>
@@ -199,7 +224,9 @@ export default function Auth() {
           <CardTitle className="text-2xl bg-gradient-primary bg-clip-text text-transparent">
             Spark Funds
           </CardTitle>
-          <CardDescription>Join the micro-donation revolution on ICP</CardDescription>
+          <CardDescription>
+            Join the micro-donation revolution on ICP
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="text-center space-y-4">
@@ -213,7 +240,11 @@ export default function Auth() {
               </p>
             </div>
 
-            <Button onClick={handleWalletConnect} disabled={connecting} className="w-full h-12 btn-web3">
+            <Button
+              onClick={handleWalletConnect}
+              disabled={connecting}
+              className="w-full h-12 btn-web3"
+            >
               {connecting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -229,8 +260,8 @@ export default function Auth() {
 
             <div className="text-xs text-muted-foreground space-y-2">
               <p>
-                Internet Identity provides secure, anonymous authentication without passwords or
-                personal data.
+                Internet Identity provides secure, anonymous authentication
+                without passwords or personal data.
               </p>
               <div className="flex items-center justify-center space-x-4 text-primary">
                 <span className="flex items-center space-x-1">
