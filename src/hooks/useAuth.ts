@@ -68,11 +68,36 @@ export const useAuth = () => {
 
   const fetchUserProfile = async (userId: string) => {
     try {
-      const { data: profileData, error } = await supabase
+      // First try to find by user_id
+      let { data: profileData, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', userId)
         .maybeSingle();
+      
+      // If not found and we have session metadata with principal_id, try that
+      if (!profileData && !error) {
+        const { data: { session } } = await supabase.auth.getSession();
+        const principalId = session?.user?.user_metadata?.principal_id;
+        
+        if (principalId) {
+          const { data: principalProfile, error: principalError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('principal_id', principalId)
+            .maybeSingle();
+          
+          if (principalProfile && !principalError) {
+            // Update the profile to use current user_id
+            await supabase
+              .from('profiles')
+              .update({ user_id: userId })
+              .eq('id', principalProfile.id);
+            
+            profileData = { ...principalProfile, user_id: userId };
+          }
+        }
+      }
       
       if (error) {
         console.error('Error fetching profile:', error);
@@ -129,13 +154,12 @@ export const useAuth = () => {
         .maybeSingle();
 
       if (existingProfile) {
-        // Existing user - sign them in with the existing user_id
+        // Existing user - sign them in and ensure profile is linked
         const { data, error } = await supabase.auth.signInAnonymously({
           options: {
             data: {
               principal_id: principalId,
-              account_id: accountId,
-              existing_user_id: existingProfile.user_id
+              account_id: accountId
             }
           }
         });
@@ -145,12 +169,12 @@ export const useAuth = () => {
           throw new Error('Failed to sign in existing user');
         }
 
-        // Update the profile's user_id to match the new session
-        if (data.user && data.user.id !== existingProfile.user_id) {
+        if (data.user) {
+          // Update profile to link with current session
           await supabase
             .from('profiles')
             .update({ user_id: data.user.id })
-            .eq('id', existingProfile.id);
+            .eq('principal_id', principalId);
         }
 
         return { success: true, isNewUser: false };
