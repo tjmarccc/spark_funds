@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
 import { AuthClient } from '@dfinity/auth-client';
+import { Principal } from '@dfinity/principal';
 
 interface Profile {
   id: string;
@@ -101,7 +102,6 @@ export const useAuth = () => {
         return;
       }
 
-      console.log('✅ Profile loaded:', profileData);
       setProfile(profileData);
 
       if (profileData?.principal_id) {
@@ -110,6 +110,7 @@ export const useAuth = () => {
           accountId: generateAccountId()
         });
       }
+
     } catch (error) {
       console.error('❌ Error in fetchUserProfile:', error);
     }
@@ -117,35 +118,33 @@ export const useAuth = () => {
 
   const connectWallet = async () => {
     setConnecting(true);
-    console.log('🔑 Attempting ICP wallet connection...');
+    console.log('🔑 Starting ICP wallet connection...');
 
     try {
       const authClient = await AuthClient.create();
 
-      if (!authClient.isAuthenticated()) {
-        console.log('📲 Launching Internet Identity login popup...');
-        await new Promise<void>((resolve, reject) => {
-          authClient.login({
-            identityProvider: 'https://identity.ic0.app',
-            onSuccess: () => {
-              console.log('✅ Internet Identity login success');
-              resolve();
-            },
-            onError: (err) => {
-              console.error('❌ Internet Identity login error:', err);
-              reject(err);
-            },
-            maxTimeToLive: BigInt(7 * 24 * 60 * 60 * 1_000_000_000),
-          });
+      // 🔁 Always show login popup — reuses existing II identity
+      await new Promise<void>((resolve, reject) => {
+        authClient.login({
+          identityProvider: 'https://identity.ic0.app',
+          onSuccess: () => {
+            console.log('✅ ICP login successful');
+            resolve();
+          },
+          onError: (err) => {
+            console.error('❌ ICP login error:', err);
+            reject(err);
+          },
+          maxTimeToLive: BigInt(7 * 24 * 60 * 60 * 1_000_000_000), // 7 days
         });
-      }
+      });
 
       const identity = authClient.getIdentity();
       const principalId = identity.getPrincipal().toString();
       const accountId = generateAccountId();
 
       setWallet({ principalId, accountId });
-      console.log('🔐 Got principal ID:', principalId);
+      console.log('👤 Principal ID:', principalId);
 
       const { data: existingProfile } = await supabase
         .from('profiles')
@@ -153,6 +152,7 @@ export const useAuth = () => {
         .eq('principal_id', principalId)
         .maybeSingle();
 
+      // 👻 Anonymous Supabase session w/ principal metadata
       const { data, error } = await supabase.auth.signInAnonymously({
         options: {
           data: { principal_id: principalId, account_id: accountId },
@@ -160,18 +160,19 @@ export const useAuth = () => {
       });
 
       if (error || !data?.user) {
-        console.error('❌ Supabase anonymous sign-in failed:', error);
+        console.error('❌ Supabase sign-in failed:', error);
         return { error };
       }
 
-      console.log('🆔 Signed in anonymously as:', data.user.id);
+      console.log('🔗 Anonymous Supabase user:', data.user.id);
 
       if (existingProfile) {
         await supabase
           .from('profiles')
           .update({ user_id: data.user.id })
           .eq('principal_id', principalId);
-        console.log('🔗 Linked profile to user_id');
+
+        console.log('🔗 Linked existing profile to new session');
       }
 
       return {
@@ -182,7 +183,7 @@ export const useAuth = () => {
         accountId,
       };
     } catch (error) {
-      console.error('❌ Wallet connection error:', error);
+      console.error('❌ Wallet connection failed:', error);
       return { error };
     } finally {
       setConnecting(false);
@@ -212,13 +213,12 @@ export const useAuth = () => {
 
       if (error) {
         if (error.code === '23505') {
-          return { error: new Error('Duplicate profile principal_id') };
+          return { error: new Error('Profile already exists for this principal') };
         }
-        console.error('❌ Profile creation error:', error);
+        console.error('❌ Profile creation failed:', error);
         return { error };
       }
 
-      console.log('✅ Created new profile:', data);
       setProfile(data);
       return { data };
     } catch (error) {
@@ -231,15 +231,15 @@ export const useAuth = () => {
     try {
       const { error } = await supabase.auth.signOut();
       if (!error) {
-        console.log('🔌 Disconnected wallet');
         setUser(null);
         setSession(null);
         setProfile(null);
         setWallet(null);
+        console.log('🔌 Disconnected Supabase session');
       }
       return { error };
     } catch (error) {
-      console.error('❌ disconnectWallet error:', error);
+      console.error('❌ disconnectWallet failed:', error);
       return { error };
     }
   };
@@ -257,12 +257,12 @@ export const useAuth = () => {
 
       if (!error && data) {
         setProfile(data);
-        console.log('✏️ Updated profile:', data);
+        console.log('✏️ Profile updated:', data);
       }
 
       return { data, error };
     } catch (error) {
-      console.error('❌ updateProfile error:', error);
+      console.error('❌ updateProfile failed:', error);
       return { error };
     }
   };
@@ -283,7 +283,7 @@ export const useAuth = () => {
   };
 };
 
-// Dummy Account ID generator (replace with proper ICP logic if needed)
+// 🧪 Dummy Account ID generator (replace with ICP hash if needed)
 const generateAccountId = (): string => {
   return Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
 };
