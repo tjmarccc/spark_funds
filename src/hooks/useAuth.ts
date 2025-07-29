@@ -34,26 +34,23 @@ export const useAuth = () => {
   const [connecting, setConnecting] = useState(false);
 
   useEffect(() => {
-    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state changed:', event, session?.user?.id);
         setSession(session);
         setUser(session?.user ?? null);
-        
+
         if (session?.user) {
-          // Fetch user profile
           await fetchUserProfile(session.user.id);
         } else {
           setProfile(null);
           setWallet(null);
         }
-        
+
         setLoading(false);
       }
     );
 
-    // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setSession(session);
@@ -68,45 +65,41 @@ export const useAuth = () => {
 
   const fetchUserProfile = async (userId: string) => {
     try {
-      // First try to find by user_id
       let { data: profileData, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', userId)
         .maybeSingle();
-      
-      // If not found and we have session metadata with principal_id, try that
+
       if (!profileData && !error) {
         const { data: { session } } = await supabase.auth.getSession();
         const principalId = session?.user?.user_metadata?.principal_id;
-        
+
         if (principalId) {
-          const { data: principalProfile, error: principalError } = await supabase
+          const { data: principalProfile } = await supabase
             .from('profiles')
             .select('*')
             .eq('principal_id', principalId)
             .maybeSingle();
-          
-          if (principalProfile && !principalError) {
-            // Update the profile to use current user_id
+
+          if (principalProfile) {
             await supabase
               .from('profiles')
               .update({ user_id: userId })
               .eq('id', principalProfile.id);
-            
+
             profileData = { ...principalProfile, user_id: userId };
           }
         }
       }
-      
+
       if (error) {
         console.error('Error fetching profile:', error);
         return;
       }
-      
+
       setProfile(profileData);
-      
-      // If profile exists and has principal_id, set wallet
+
       if (profileData?.principal_id) {
         setWallet({
           principalId: profileData.principal_id,
@@ -120,88 +113,66 @@ export const useAuth = () => {
 
   const connectWallet = async () => {
     setConnecting(true);
-    
+
     try {
-      // Create ICP AuthClient
       const authClient = await AuthClient.create();
-      
-      // Login with Internet Identity
-      await new Promise<void>((resolve, reject) => {
-        authClient.login({
-          identityProvider: "https://identity.ic0.app",
-          onSuccess: () => resolve(),
-          onError: (error) => reject(error),
-          maxTimeToLive: BigInt(7 * 24 * 60 * 60 * 1000 * 1000 * 1000), // 7 days in nanoseconds
+
+      // If already authenticated, skip login
+      if (!authClient.isAuthenticated()) {
+        await new Promise<void>((resolve, reject) => {
+          authClient.login({
+            identityProvider: "https://identity.ic0.app",
+            onSuccess: () => resolve(),
+            onError: (err) => reject(err),
+            maxTimeToLive: BigInt(7 * 24 * 60 * 60 * 1_000_000_000), // 7 days
+          });
         });
-      });
-      
-      // Get the identity from auth client
+      }
+
       const identity = authClient.getIdentity();
       const principal = identity.getPrincipal();
       const principalId = principal.toString();
-      
-      // Generate account ID from principal
       const accountId = generateAccountId();
-      
-      // Set wallet info immediately
+
       setWallet({ principalId, accountId });
-      
-      // Check if profile exists with this principal
+
+      // Check if there's a profile for this principal
       const { data: existingProfile } = await supabase
         .from('profiles')
         .select('*')
         .eq('principal_id', principalId)
         .maybeSingle();
 
-      if (existingProfile) {
-        // Existing user - sign them in and ensure profile is linked
-        const { data, error } = await supabase.auth.signInAnonymously({
-          options: {
-            data: {
-              principal_id: principalId,
-              account_id: accountId
-            }
+      // Sign in anonymously with metadata
+      const { data, error } = await supabase.auth.signInAnonymously({
+        options: {
+          data: {
+            principal_id: principalId,
+            account_id: accountId
           }
-        });
-
-        if (error) {
-          console.error('Sign in error:', error);
-          throw new Error('Failed to sign in existing user');
         }
+      });
 
-        if (data.user) {
-          // Update profile to link with current session
-          await supabase
-            .from('profiles')
-            .update({ user_id: data.user.id })
-            .eq('principal_id', principalId);
-        }
-
-        return { success: true, isNewUser: false };
-      } else {
-        // New user - create anonymous session first
-        const { data, error } = await supabase.auth.signInAnonymously({
-          options: {
-            data: {
-              principal_id: principalId,
-              account_id: accountId
-            }
-          }
-        });
-
-        if (error || !data.user) {
-          console.error('Anonymous sign in error:', error);
-          throw new Error('Failed to create user session');
-        }
-
-        return { 
-          success: true, 
-          isNewUser: true, 
-          principalId, 
-          accountId, 
-          userId: data.user.id 
-        };
+      if (error || !data?.user) {
+        console.error('Supabase anonymous sign in error:', error);
+        return { error };
       }
+
+      if (existingProfile) {
+        // Link existing profile to the session's user_id
+        await supabase
+          .from('profiles')
+          .update({ user_id: data.user.id })
+          .eq('principal_id', principalId);
+      }
+
+      return {
+        success: true,
+        isNewUser: !existingProfile,
+        userId: data.user.id,
+        principalId,
+        accountId
+      };
     } catch (error) {
       console.error('Wallet connection error:', error);
       return { error };
@@ -224,7 +195,7 @@ export const useAuth = () => {
           email,
           is_creator: isCreator,
           principal_id: wallet.principalId,
-          wallet_balance: 100, // Starting balance
+          wallet_balance: 100,
           total_donated: 0,
           total_received: 0
         })
@@ -232,16 +203,15 @@ export const useAuth = () => {
         .single();
 
       if (error) {
+        if (error.code === '23505') {
+          return { error: new Error('Profile with this principal_id already exists') };
+        }
         console.error('Profile creation error:', error);
         return { error };
       }
 
-      if (data) {
-        setProfile(data);
-        return { data, error: null };
-      }
-
-      return { error: new Error('Failed to create profile') };
+      setProfile(data);
+      return { data, error: null };
     } catch (error) {
       console.error('Error in createProfile:', error);
       return { error };
@@ -302,17 +272,7 @@ export const useAuth = () => {
   };
 };
 
-// Generate a mock ICP Principal ID (replace with real ICP SDK)
-const generatePrincipalId = (): string => {
-  const chars = 'abcdefghijklmnopqrstuvwxyz234567';
-  let result = '';
-  for (let i = 0; i < 27; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-};
-
-// Generate a mock Account ID (replace with real ICP SDK)
+// Replace with actual derivation for ICP wallets if needed
 const generateAccountId = (): string => {
   return Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
 };
