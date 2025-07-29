@@ -1,0 +1,207 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Web3/ICP Design System - All colors MUST be HSL */
+
+@layer base {
+  :root {
+    /* Web3 Dark Theme Base */
+    --background: 240 8% 5%;
+    --foreground: 210 40% 95%;
+    --card: 240 8% 8%;
+    --card-foreground: 210 40% 90%;
+    --popover: 240 8% 8%;
+    --popover-foreground: 210 40% 90%;
+    
+    /* ICP Brand Colors */
+    --primary: 270 70% 65%; /* ICP Purple */
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 270 80% 75%;
+    
+    /* Web3 Accent Colors */
+    --secondary: 195 100% 50%; /* Cyan */
+    --secondary-foreground: 240 8% 5%;
+    --accent: 290 85% 70%; /* Bright Purple */
+    --accent-foreground: 0 0% 100%;
+    
+    /* Muted Colors */
+    --muted: 240 8% 12%;
+    --muted-foreground: 210 20% 65%;
+    
+    /* Status Colors */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --success: 140 70% 55%;
+    --success-foreground: 0 0% 100%;
+    --warning: 45 100% 60%;
+    --warning-foreground: 240 8% 5%;
+    
+    /* Interactive Elements */
+    --border: 240 8% 15%;
+    --input: 240 8% 10%;
+    --ring: 270 70% 65%;
+    --radius: 0.75rem;
+    
+    /* Web3 Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(270, 70%, 65%), hsl(240, 80%, 70%));
+    --gradient-secondary: linear-gradient(135deg, hsl(195, 100%, 50%), hsl(220, 100%, 60%));
+    --gradient-web3: linear-gradient(135deg, hsl(270, 70%, 65%), hsl(195, 100%, 50%));
+    --gradient-card: linear-gradient(145deg, hsl(240, 8%, 8%), hsl(240, 8%, 12%));
+    --gradient-hero: linear-gradient(135deg, hsl(240, 8%, 5%), hsl(270, 70%, 10%));
+    
+    /* Glow Effects */
+    --glow-primary: 0 0 20px hsl(270 70% 65% / 0.5);
+    --glow-secondary: 0 0 20px hsl(195 100% 50% / 0.5);
+    --glow-success: 0 0 20px hsl(140 70% 55% / 0.5);
+    
+    /* Sidebar */
+    --sidebar-background: 240 8% 6%;
+    --sidebar-foreground: 210 40% 85%;
+    --sidebar-primary: 270 70% 65%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 8% 12%;
+    --sidebar-accent-foreground: 210 40% 85%;
+    --sidebar-border: 240 8% 15%;
+    --sidebar-ring: 270 70% 65%;
+  }
+
+  .dark {
+    /* Enhanced dark mode for better contrast */
+    --background: 240 10% 3%;
+    --foreground: 210 40% 98%;
+    --card: 240 10% 4%;
+    --card-foreground: 210 40% 95%;
+    --muted: 240 10% 8%;
+    --border: 240 10% 12%;
+    --input: 240 10% 6%;
+    --sidebar-background: 240 10% 4%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    background-image: 
+      radial-gradient(circle at 20% 80%, hsl(270 70% 65% / 0.05) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, hsl(195 100% 50% / 0.05) 0%, transparent 50%);
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  /* Web3 Effects */
+  .glow-primary {
+    box-shadow: var(--glow-primary);
+  }
+  
+  .glow-secondary {
+    box-shadow: var(--glow-secondary);
+  }
+  
+  .gradient-text {
+    background: var(--gradient-web3);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  
+  .gradient-bg {
+    background: var(--gradient-web3);
+    background-size: 200% 200%;
+    animation: gradient-shift 3s ease infinite;
+  }
+  
+  .card-web3 {
+    background: var(--gradient-card);
+    border: 1px solid hsl(var(--border));
+    transition: all 0.3s ease;
+  }
+  
+  .card-web3:hover {
+    border-color: hsl(var(--primary));
+    box-shadow: var(--glow-primary);
+    transform: translateY(-2px);
+  }
+  
+  .btn-web3 {
+    background: var(--gradient-primary);
+    box-shadow: var(--glow-primary);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .btn-web3:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 30px hsl(270 70% 65% / 0.7);
+  }
+  
+  .btn-web3::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.2) 50%, transparent 70%);
+    transform: translateX(-100%);
+    transition: transform 0.6s ease;
+  }
+  
+  .btn-web3:hover::before {
+    transform: translateX(100%);
+  }
+  
+  .float {
+    animation: float 3s ease-in-out infinite;
+  }
+  
+  .pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+}
+
+@layer utilities {
+  @keyframes gradient-shift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+  
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+  
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 20px hsl(270 70% 65% / 0.3); }
+    50% { box-shadow: 0 0 30px hsl(270 70% 65% / 0.6); }
+  }
+  
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  @keyframes slide-in-right {
+    from { opacity: 0; transform: translateX(50px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  
+  .animate-fade-in {
+    animation: fade-in 0.6s ease-out;
+  }
+  
+  .animate-slide-in-right {
+    animation: slide-in-right 0.6s ease-out;
+  }
+  
+  .animate-gradient {
+    animation: gradient-shift 3s ease infinite;
+  }
+}
